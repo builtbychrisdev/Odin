@@ -3,6 +3,7 @@ package com.odtheking.odin.events.core
 import com.odtheking.odin.events.PacketEvent
 import net.minecraft.network.protocol.Packet
 import net.minecraft.util.profiling.Profiler
+import net.minecraft.util.profiling.ProfilerFiller
 
 object EventBus {
 
@@ -14,6 +15,8 @@ object EventBus {
     val subscriberClasses = mutableMapOf<Any, Class<*>>()
     @JvmField
     val invokers = HashMap<Class<out Event>, Invoker>()
+
+    private val profilerNameCache = HashMap<Class<out Event>, String>()
 
     fun subscribe(subscriber: Any) {
         if (activeSubscribers.add(subscriber)) {
@@ -29,7 +32,17 @@ object EventBus {
 
     @JvmStatic
     fun <T : Event> post(event: T) {
-        invokers[event.javaClass]?.invoke(event)
+        val eventClass = event.javaClass
+        val invoker = invokers[eventClass] ?: return
+
+        val profiler = Profiler.get()
+        val profilerName = profilerNameCache.getOrPut(eventClass) { "Odin: ${eventClass.simpleName}" }
+        profiler.push(profilerName)
+        try {
+            invoker.invoke(event, profiler)
+        } finally {
+            profiler.pop()
+        }
     }
 
     fun <T : Event> registerListener(
@@ -73,7 +86,7 @@ object EventBus {
 
         invokers[eventClass] = when {
             activeListeners.isEmpty() -> EmptyInvoker
-            else -> InvokerFactory.build("Odin: ${eventClass.simpleName}", activeListeners)
+            else -> InvokerFactory.build(activeListeners)
         }
     }
 
@@ -98,30 +111,24 @@ object EventBus {
     }
 
     interface Invoker {
-        fun invoke(event: Event)
+        fun invoke(event: Event, profiler: ProfilerFiller)
     }
 
     private object EmptyInvoker : Invoker {
-        override fun invoke(event: Event) {}
+        override fun invoke(event: Event, profiler: ProfilerFiller) {}
     }
 
     private object InvokerFactory {
-        fun build(profilerName: String, listeners: Array<EventListener<Event>>): Invoker {
+        fun build(listeners: Array<EventListener<Event>>): Invoker {
             return object : Invoker {
-                override fun invoke(event: Event) {
-                    val profiler = Profiler.get()
-                    profiler.push(profilerName)
-                    try {
-                        for (listener in listeners) {
-                            profiler.push(listener.subscriberName)
-                            try {
-                                listener.invoke(event)
-                            } finally {
-                                profiler.pop()
-                            }
+                override fun invoke(event: Event, profiler: ProfilerFiller) {
+                    for (listener in listeners) {
+                        profiler.push(listener.subscriberName)
+                        try {
+                            listener.invoke(event)
+                        } finally {
+                            profiler.pop()
                         }
-                    } finally {
-                        profiler.pop()
                     }
                 }
             }

@@ -4,16 +4,17 @@ import com.odtheking.odin.clickgui.settings.impl.BooleanSetting
 import com.odtheking.odin.clickgui.settings.impl.ColorSetting
 import com.odtheking.odin.clickgui.settings.impl.NumberSetting
 import com.odtheking.odin.events.LevelEvent
-import com.odtheking.odin.events.ParticleEvent
 import com.odtheking.odin.events.RenderExtractEvent
 import com.odtheking.odin.events.TickEvent
 import com.odtheking.odin.events.core.on
+import com.odtheking.odin.events.core.onReceive
 import com.odtheking.odin.features.Module
 import com.odtheking.odin.utils.Colors
 import com.odtheking.odin.utils.handlers.schedule
 import com.odtheking.odin.utils.render.drawLine
 import com.odtheking.odin.utils.skyblock.dungeon.DungeonUtils
 import net.minecraft.core.particles.ParticleTypes
+import net.minecraft.network.protocol.game.ClientboundLevelParticlesPacket
 import net.minecraft.world.phys.Vec3
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -65,8 +66,8 @@ object MageBeam : Module(
     private var currentTick = 0
 
     init {
-        on<ParticleEvent> {
-            if (!DungeonUtils.inDungeons || particle != ParticleTypes.FIREWORK) return@on
+        onReceive<ClientboundLevelParticlesPacket> {
+            if (!DungeonUtils.inDungeons || particle != ParticleTypes.FIREWORK) return@onReceive
 
             val recentBeam = activeBeams.lastOrNull()
             val newPoint = Vec3(x, y, z)
@@ -82,7 +83,7 @@ object MageBeam : Module(
                 }
             }
 
-            if (hideParticles) cancel()
+            if (hideParticles) it.cancel()
         }
 
         on<TickEvent.Server> {

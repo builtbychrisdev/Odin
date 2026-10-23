@@ -81,7 +81,6 @@ object Highlight : Module(
     @JvmStatic
     fun getTeammateColor(entity: Entity): Int? {
         if (!enabled || !teammateClassGlow || !DungeonUtils.inDungeons || entity !is Player) return null
-        val name = entity.gameProfile.name
-        return DungeonUtils.dungeonTeammates.find { it.name == name }?.clazz?.color?.rgba
+        return DungeonUtils.dungeonTeammates.find { it.name == entity.name.string }?.clazz?.color?.rgba
     }
 }
